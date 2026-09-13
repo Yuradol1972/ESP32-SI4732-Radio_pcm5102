@@ -54,17 +54,26 @@ Because the stock receiver PCB routes analog audio directly from the SI4732 chip
 
 ## 🚀 Flashing the Firmware
 
-### Prerequisites
-- Install [Arduino CLI](https://arduino.github.io/arduino-cli/latest/) or Arduino IDE with ESP32 board package (`esp32:esp32` version 3.x).
-- Connect the ESP32-S3 receiver to your PC via USB-C.
+### Option 1: Flash Pre-Compiled Binary (No Compilation Needed)
+The repository includes ready-to-flash binaries in the [`binaries/`](binaries/) folder:
+- **Merged Single-File Binary**: [`binaries/ats-mini.ino.merged.bin`](binaries/ats-mini.ino.merged.bin) (contains bootloader, partition table, and hybrid firmware in one 8MB image).
 
-### One-Click PowerShell Script
-Run the automated flasher in PowerShell:
+Flash using `esptool`:
+```powershell
+python -m esptool --chip esp32s3 -p <PORT> -b 921600 write_flash 0x0 binaries/ats-mini.ino.merged.bin
+```
+
+Or flash individual segments:
+```powershell
+python -m esptool --chip esp32s3 -p <PORT> -b 921600 write_flash 0x0 binaries/ats-mini.ino.bootloader.bin 0x8000 binaries/ats-mini.ino.partitions.bin 0x10000 binaries/ats-mini.ino.bin
+```
+
+### Option 2: Build & Flash with Automated Script
 ```powershell
 cd ats-mini
 .\flash.ps1
 ```
-The script will automatically detect your ESP32-S3 COM port, invoke `arduino-cli`, and upload the bootloader, partition table, and hybrid firmware.
+The script will automatically detect your ESP32-S3 COM port, invoke `arduino-cli`, and upload the firmware.
 
 ---
 
