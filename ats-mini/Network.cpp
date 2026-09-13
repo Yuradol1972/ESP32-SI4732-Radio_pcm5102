@@ -218,7 +218,7 @@ void netInit(uint8_t netMode, bool showStatus)
     webInit();
 
     // Initialize mDNS
-    MDNS.begin("atsmini"); // Set the hostname to "atsmini.local"
+    MDNS.begin("esp32radio"); // Set the hostname to "esp32radio.local"
     MDNS.addService("http", "tcp", 80);
   }
 }
@@ -279,7 +279,7 @@ static bool wifiInitAP()
 
   drawScreen(
     ("Use Access Point " + String(apSSID)).c_str(),
-    ("IP : " + WiFi.softAPIP().toString() + " or atsmini.local").c_str()
+    ("IP : " + WiFi.softAPIP().toString() + " or esp32radio.local").c_str()
   );
 
   ajaxInterval = 2500;
@@ -351,7 +351,7 @@ static bool wifiConnect()
     // WiFi connection succeeded
     drawScreen(
       ("Connected to WiFi network (" + WiFi.SSID() + ")").c_str(),
-      ("IP : " + WiFi.localIP().toString() + " or atsmini.local").c_str()
+      ("IP : " + WiFi.localIP().toString() + " or esp32radio.local").c_str()
     );
     // Done
     ajaxInterval = 1000;
@@ -723,7 +723,7 @@ static const String webPage(const String &body)
 "<HEAD>"
   "<META CHARSET='UTF-8'>"
   "<META NAME='viewport' CONTENT='width=device-width, initial-scale=1.0'>"
-  "<TITLE>ATS-Mini Config</TITLE>"
+  "<TITLE>ESP32-SI4732 Radio</TITLE>"
   "<STYLE>" + webStyleSheet() + "</STYLE>"
 "</HEAD>"
 "<BODY STYLE='font-family: sans-serif;'>" + body + "</BODY>"
@@ -812,7 +812,7 @@ static const String webRadioPage()
   }
 
   return webPage(
-"<H1>ATS-Mini Pocket Receiver</H1>"
+"<H1>ESP32-SI4732 Radio</H1>"
 "<P ALIGN='CENTER'>"
   "<A HREF='/memory'>Memory</A>&nbsp;|&nbsp;<A HREF='/webradio'>Web Radio</A>&nbsp;|&nbsp;<A HREF='/config'>Config</A>"
 "</P>"
@@ -879,7 +879,7 @@ static const String webMemoryPage()
   }
 
   return webPage(
-"<H1>ATS-Mini Pocket Receiver Memory</H1>"
+"<H1>ESP32-SI4732 Memory</H1>"
 "<P ALIGN='CENTER'>"
   "<A HREF='/'>Status</A>&nbsp;|&nbsp;<A HREF='/webradio'>Web Radio</A>&nbsp;|&nbsp;<A HREF='/config'>Config</A>"
 "</P>"
@@ -905,7 +905,7 @@ const String webConfigPage()
   String splashResolution = String(spr.width()) + "x" + String(spr.height());
 
   return webPage(
-"<H1>ATS-Mini Config</H1>"
+"<H1>ESP32-SI4732 Config</H1>"
 "<P ALIGN='CENTER'>"
   "<A HREF='/'>Status</A>"
   "&nbsp;|&nbsp;<A HREF='/memory'>Memory</A>"

@@ -1,8 +1,6 @@
 # ESP32-S3 SI4732 Pocket Radio + Internet Radio (Hybrid Receiver)
 
-![](docs/source/_static/esp32-si4732-ui-theme.jpg)
-
-This repository contains enhanced hybrid firmware for the **ESP32-S3 + SI4732** pocket all-band receiver (such as the Banggood 1.9" IPS mini radio). It seamlessly integrates the full-featured **ATS-Mini** multi-band broadcast radio engine with an **Internet Radio streaming subsystem** ported from the high-stability ESP32-S3 audio engine.
+This repository contains enhanced hybrid firmware for the **ESP32-S3 + SI4732** pocket all-band receiver (such as the Banggood 1.9" IPS mini radio). It seamlessly integrates the full-featured multi-band broadcast radio engine with an **Internet Radio streaming subsystem** ported from the high-stability ESP32-S3 audio engine.
 
 ---
 
@@ -37,7 +35,7 @@ This repository contains enhanced hybrid firmware for the **ESP32-S3 + SI4732** 
 
 ## 🛠 Hardware Audio Routing (The Mod)
 
-Because the stock ATS-Mini PCB routes analog audio directly from the SI4732 chip to the onboard speaker amplifier, the ESP32-S3 needs an audio path to deliver digital radio streams to the speaker/headphone jack.
+Because the stock receiver PCB routes analog audio directly from the SI4732 chip to the onboard speaker amplifier, the ESP32-S3 needs an audio path to deliver digital radio streams to the speaker/headphone jack.
 
 ### Spare ESP32-S3 GPIO Pins Used:
 | Signal | ESP32-S3 Pin | Description |

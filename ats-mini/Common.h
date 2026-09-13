@@ -11,14 +11,14 @@ static constexpr const lgfx::IFont* FONT_SMALL   = &lgfx::fonts::Font2;  // 16px
 static constexpr const lgfx::IFont* FONT_LARGE   = &lgfx::fonts::Font4;  // 26px values and titles
 static constexpr const lgfx::IFont* FONT_DIGITS  = &lgfx::fonts::Font7;  // 48px 7-segment digits
 
-#define RECEIVER_DESC  "ESP32-SI4732 Receiver"
-#define RECEIVER_NAME  "ATS-Mini"
-#define FIRMWARE_URL   "https://github.com/esp32-si4732/ats-mini"
-#define MANUAL_URL     "https://esp32-si4732.github.io/ats-mini/manual.html"
-#define AUTHORS_LINE1  "Authors: PU2CLR (Ricardo Caratti),"
-#define AUTHORS_LINE2  "Volos Projects, Ralph Xavier, Sunnygold,"
-#define AUTHORS_LINE3  "Goshante, G8PTN (Dave), R9UCL (Max Arnold),"
-#define AUTHORS_LINE4  "Marat Fayzullin"
+#define RECEIVER_DESC  "ESP32-SI4732 Radio"
+#define RECEIVER_NAME  "ESP32-Radio"
+#define FIRMWARE_URL   "https://github.com/sureshmagnolia/ESP32-SI4732-Radio"
+#define MANUAL_URL     "https://github.com/sureshmagnolia/ESP32-SI4732-Radio"
+#define AUTHORS_LINE1  "ESP32-S3 All-Band + Web Radio"
+#define AUTHORS_LINE2  "FM (RDS), MW, SW, SSB, Web"
+#define AUTHORS_LINE3  "GitHub: sureshmagnolia"
+#define AUTHORS_LINE4  "ESP32-SI4732-Radio"
 
 #define VER_APP        238  // Firmware version
 #define VER_SETTINGS   71   // Settings version

@@ -5,7 +5,7 @@ param (
 $ErrorActionPreference = "Stop"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   ATS-Mini Hybrid Firmware Flasher (SI4732 + Web Radio)   " -ForegroundColor Cyan
+Write-Host "   ESP32-SI4732 Hybrid Radio Flasher (SI4732 + Web Radio)  " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # If no port specified, attempt auto-detection via arduino-cli
@@ -30,7 +30,7 @@ if ([string]::IsNullOrWhiteSpace($Port)) {
     exit 1
 }
 
-Write-Host "`nFlashing ATS-Mini Hybrid Firmware to $Port..." -ForegroundColor Cyan
+Write-Host "`nFlashing ESP32-SI4732 Hybrid Firmware to $Port..." -ForegroundColor Cyan
 
 $sketchDir = "$PSScriptRoot"
 $fqbn = "esp32:esp32:esp32s3:CDCOnBoot=cdc,FlashSize=8M,PSRAM=opi,CPUFreq=80,USBMode=hwcdc,FlashMode=qio,PartitionScheme=custom,DebugLevel=none"
@@ -42,7 +42,7 @@ Invoke-Expression $cmd
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`n[SUCCESS] Firmware uploaded successfully to $Port!" -ForegroundColor Green
-    Write-Host "Your ATS-Mini is now running the Hybrid SI4732 + Internet Radio firmware." -ForegroundColor Green
+    Write-Host "Your ESP32-SI4732 Radio is now running the Hybrid SI4732 + Internet Radio firmware." -ForegroundColor Green
 } else {
     Write-Host "`n[ERROR] Upload failed. Please check your cable, port, and bootloader status." -ForegroundColor Red
 }
