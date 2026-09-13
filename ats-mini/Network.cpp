@@ -6,6 +6,7 @@
 #include "Draw.h"
 #include "Splash.h"
 #include "TcpMode.h"
+#include "WebAudio.h"
 
 #include <WiFi.h>
 #include <WiFiMulti.h>
@@ -73,6 +74,7 @@ static const String webThemeSelector();
 static const String webRadioPage();
 static const String webMemoryPage();
 static const String webConfigPage();
+static const String webWebRadioPage();
 
 struct SplashUploadState
 {
@@ -368,6 +370,63 @@ static void webInit()
 
   server.on("/memory", HTTP_ANY, [] (AsyncWebServerRequest *request) {
     request->send(200, "text/html", webMemoryPage());
+  });
+
+  server.on("/webradio", HTTP_ANY, [] (AsyncWebServerRequest *request) {
+    request->send(200, "text/html", webWebRadioPage());
+  });
+
+  server.on("/api/favorites", HTTP_GET, [] (AsyncWebServerRequest *request) {
+    if(!LittleFS.exists(FAVORITES_FILE_PATH))
+    {
+      webAudio.loadFavorites();
+    }
+    request->send(LittleFS, FAVORITES_FILE_PATH, "application/json");
+  });
+
+  server.on("/api/favorites/add", HTTP_POST, [] (AsyncWebServerRequest *request) {
+    if(request->hasParam("name", true) && request->hasParam("url", true))
+    {
+      String name = request->getParam("name", true)->value();
+      String url  = request->getParam("url", true)->value();
+      String lang = request->hasParam("lang", true) ? request->getParam("lang", true)->value() : "";
+      webAudio.addFavorite(name, url, lang);
+      Band *b = getCurrentBand();
+      if(b && b->bandType == WEB_BAND_TYPE) b->maximumFreq = max(1, webAudio.getTotalStations());
+      return request->send(200, "application/json", "{\"status\":\"ok\",\"total\":" + String(webAudio.getTotalStations()) + "}");
+    }
+    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing name or url\"}");
+  });
+
+  server.on("/api/favorites/delete", HTTP_POST, [] (AsyncWebServerRequest *request) {
+    if(request->hasParam("id", true))
+    {
+      int id = request->getParam("id", true)->value().toInt();
+      webAudio.deleteFavorite(id);
+      Band *b = getCurrentBand();
+      if(b && b->bandType == WEB_BAND_TYPE) b->maximumFreq = max(1, webAudio.getTotalStations());
+      return request->send(200, "application/json", "{\"status\":\"ok\",\"total\":" + String(webAudio.getTotalStations()) + "}");
+    }
+    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing id\"}");
+  });
+
+  server.on("/api/play", HTTP_ANY, [] (AsyncWebServerRequest *request) {
+    if(request->hasParam("id"))
+    {
+      int id = request->getParam("id")->value().toInt();
+      if(id >= 0 && id < webAudio.getTotalStations())
+      {
+        webAudio.setStation(id);
+        Band *b = getCurrentBand();
+        if(b && b->bandType == WEB_BAND_TYPE)
+        {
+          b->currentFreq = id + 1;
+          currentFrequency = id + 1;
+        }
+        return request->send(200, "application/json", "{\"status\":\"ok\",\"playing\":" + String(id) + "}");
+      }
+    }
+    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid station id\"}");
   });
 
   server.on("/config", HTTP_ANY, [] (AsyncWebServerRequest *request) {
@@ -755,7 +814,7 @@ static const String webRadioPage()
   return webPage(
 "<H1>ATS-Mini Pocket Receiver</H1>"
 "<P ALIGN='CENTER'>"
-  "<A HREF='/memory'>Memory</A>&nbsp;|&nbsp;<A HREF='/config'>Config</A>"
+  "<A HREF='/memory'>Memory</A>&nbsp;|&nbsp;<A HREF='/webradio'>Web Radio</A>&nbsp;|&nbsp;<A HREF='/config'>Config</A>"
 "</P>"
 "<TABLE COLUMNS=2>"
 "<TR>"
@@ -822,7 +881,7 @@ static const String webMemoryPage()
   return webPage(
 "<H1>ATS-Mini Pocket Receiver Memory</H1>"
 "<P ALIGN='CENTER'>"
-  "<A HREF='/'>Status</A>&nbsp;|&nbsp;<A HREF='/config'>Config</A>"
+  "<A HREF='/'>Status</A>&nbsp;|&nbsp;<A HREF='/webradio'>Web Radio</A>&nbsp;|&nbsp;<A HREF='/config'>Config</A>"
 "</P>"
 "<TABLE COLUMNS=2>" + items + "</TABLE>"
 );
@@ -850,6 +909,7 @@ const String webConfigPage()
 "<P ALIGN='CENTER'>"
   "<A HREF='/'>Status</A>"
   "&nbsp;|&nbsp;<A HREF='/memory'>Memory</A>"
+  "&nbsp;|&nbsp;<A HREF='/webradio'>Web Radio</A>"
 "</P>"
 "<FORM ACTION='/setconfig' METHOD='POST' ENCTYPE='multipart/form-data' ONSUBMIT='browserDateTime(true)'>"
   "<TABLE COLUMNS=2>"
@@ -968,3 +1028,303 @@ const String webConfigPage()
 "</SCRIPT>"
 );
 }
+
+static const String webWebRadioPage()
+{
+  return webPage(
+R"rawliteral(
+<H1>Internet Radio Manager</H1>
+<P ALIGN='CENTER'>
+  <A HREF='/'>Status</A>&nbsp;|&nbsp;<A HREF='/memory'>Memory</A>&nbsp;|&nbsp;<B><A HREF='/webradio'>Web Radio</A></B>&nbsp;|&nbsp;<A HREF='/config'>Config</A>
+</P>
+
+<STYLE>
+  .wr-container { max-width: 820px; margin: 0 auto; padding: 10px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .wr-card { background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+  .wr-card h2 { margin-top: 0; font-size: 1.25rem; color: #1e293b; border-bottom: 2px solid #3b82f6; padding-bottom: 6px; }
+  .wr-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; background: #e0e7ff; color: #3730a3; margin-right: 5px; }
+  .wr-badge-ch { background: #0284c7; color: #fff; }
+  .wr-badge-state { background: #f1f5f9; color: #475569; }
+  .wr-btn { display: inline-block; padding: 6px 12px; border-radius: 6px; border: none; font-size: 0.85rem; font-weight: 600; cursor: pointer; text-decoration: none; }
+  .wr-btn-play { background: #10b981; color: white; margin-right: 4px; }
+  .wr-btn-play:hover { background: #059669; }
+  .wr-btn-del { background: #ef4444; color: white; }
+  .wr-btn-del:hover { background: #dc2626; }
+  .wr-btn-add { background: #3b82f6; color: white; }
+  .wr-btn-add:hover { background: #2563eb; }
+  .wr-btn-saved { background: #94a3b8; color: white; cursor: default; }
+  .wr-input { width: 100%; box-sizing: border-box; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; margin-bottom: 8px; }
+  .wr-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .wr-pill { padding: 4px 10px; border-radius: 16px; background: #e2e8f0; color: #334155; font-size: 0.8rem; cursor: pointer; user-select: none; }
+  .wr-pill.active { background: #2563eb; color: white; }
+  .wr-catalog-list { max-height: 420px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; background: white; }
+  .wr-cat-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f1f5f9; }
+  .wr-cat-item:last-child { border-bottom: none; }
+  .wr-cat-info { flex: 1; min-width: 0; padding-right: 10px; }
+  .wr-cat-name { font-weight: 600; font-size: 0.95rem; color: #0f172a; }
+  .wr-cat-meta { font-size: 0.8rem; color: #64748b; margin-top: 2px; }
+  .wr-toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: white; padding: 10px 18px; border-radius: 8px; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; z-index: 1000; }
+  table.wr-fav-table { width: 100%; border-collapse: collapse; background: white; border-radius: 6px; overflow: hidden; }
+  table.wr-fav-table th, table.wr-fav-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #f1f5f9; }
+  table.wr-fav-table th { background: #f1f5f9; font-size: 0.8rem; text-transform: uppercase; color: #475569; }
+</STYLE>
+
+<DIV CLASS='wr-container'>
+  <!-- Device Favorites Card -->
+  <DIV CLASS='wr-card'>
+    <H2>📻 Device Favorites (Stored in Radio LittleFS)</H2>
+    <P STYLE='font-size:0.85rem; color:#64748b; margin-bottom:12px;'>
+      These stations are stored directly on the ESP32-S3 and can be tuned using the physical rotary encoder dial in WEB band mode.
+      (<SPAN ID='favCount'>0</SPAN> stations saved)
+    </P>
+    <DIV STYLE='overflow-x:auto;'>
+      <TABLE CLASS='wr-fav-table'>
+        <THEAD>
+          <TR><TH>CH</TH><TH>Station Name</TH><TH>Language / Genre</TH><TH>Actions</TH></TR>
+        </THEAD>
+        <TBODY ID='favTableBody'>
+          <TR><TD COLSPAN='4' STYLE='text-align:center;'>Loading favorites from radio...</TD></TR>
+        </TBODY>
+      </TABLE>
+    </DIV>
+  </DIV>
+
+  <!-- Add Custom Station Card -->
+  <DIV CLASS='wr-card'>
+    <H2>➕ Add Custom Stream</H2>
+    <FORM ID='customForm' ONSUBMIT='return addCustomStation(event);'>
+      <TABLE STYLE='width:100%;'>
+        <TR>
+          <TD STYLE='width:30%;'><INPUT TYPE='text' ID='custName' CLASS='wr-input' PLACEHOLDER='Station Name (e.g. My Radio)' REQUIRED></TD>
+          <TD STYLE='width:45%;'><INPUT TYPE='text' ID='custUrl' CLASS='wr-input' PLACEHOLDER='Stream URL (http://... / .m3u8)' REQUIRED></TD>
+          <TD STYLE='width:25%;'><INPUT TYPE='text' ID='custLang' CLASS='wr-input' PLACEHOLDER='Language / Genre'></TD>
+        </TR>
+        <TR>
+          <TD COLSPAN='3' STYLE='text-align:right;'>
+            <BUTTON TYPE='submit' CLASS='wr-btn wr-btn-add'>+ Add to Device Favorites</BUTTON>
+          </TD>
+        </TR>
+      </TABLE>
+    </FORM>
+  </DIV>
+
+  <!-- Master Online Catalog Card -->
+  <DIV CLASS='wr-card'>
+    <H2>🌐 Master Online Catalog (GitHub Repository)</H2>
+    <P STYLE='font-size:0.85rem; color:#64748b; margin-bottom:8px;'>
+      Live catalog synced from <A HREF='https://github.com/sureshmagnolia/ESP32-SI4732-Radio' TARGET='_blank'>sureshmagnolia/ESP32-SI4732-Radio</A>.
+      Click <B>[⭐ Add]</B> to save any station to your radio.
+    </P>
+    <INPUT TYPE='text' ID='catalogSearch' CLASS='wr-input' PLACEHOLDER='🔍 Search 270+ stations by name, city, or language...' ONINPUT='filterCatalog()'>
+    <DIV CLASS='wr-pills' ID='catPills'>
+      <DIV CLASS='wr-pill active' ONCLICK='selectPill(this, "ALL")'>All</DIV>
+      <DIV CLASS='wr-pill' ONCLICK='selectPill(this, "Malayalam")'>Malayalam</DIV>
+      <DIV CLASS='wr-pill' ONCLICK='selectPill(this, "Hindi")'>Hindi</DIV>
+      <DIV CLASS='wr-pill' ONCLICK='selectPill(this, "Tamil")'>Tamil</DIV>
+      <DIV CLASS='wr-pill' ONCLICK='selectPill(this, "Telugu")'>Telugu</DIV>
+      <DIV CLASS='wr-pill' ONCLICK='selectPill(this, "Kannada")'>Kannada</DIV>
+      <DIV CLASS='wr-pill' ONCLICK='selectPill(this, "Classical")'>Classical</DIV>
+      <DIV CLASS='wr-pill' ONCLICK='selectPill(this, "English")'>English</DIV>
+    </DIV>
+    <DIV CLASS='wr-catalog-list' ID='catalogContainer'>
+      <DIV STYLE='padding:20px; text-align:center; color:#64748b;'>Loading online catalog from GitHub...</DIV>
+    </DIV>
+  </DIV>
+</DIV>
+
+<DIV ID='toast' CLASS='wr-toast'></DIV>
+
+<SCRIPT>
+const CATALOG_URL = "https://raw.githubusercontent.com/sureshmagnolia/ESP32-SI4732-Radio/main/stations.json";
+let deviceFavorites = [];
+let onlineCatalog = [];
+let activePill = "ALL";
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.innerText = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
+function loadFavorites() {
+  fetch('/api/favorites')
+    .then(r => r.json())
+    .then(data => {
+      deviceFavorites = data || [];
+      renderFavorites();
+      renderCatalog();
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById('favTableBody').innerHTML = "<TR><TD COLSPAN='4' STYLE='text-align:center;color:red;'>Failed to load favorites.</TD></TR>";
+    });
+}
+
+function renderFavorites() {
+  const tbody = document.getElementById('favTableBody');
+  document.getElementById('favCount').innerText = deviceFavorites.length;
+  if (deviceFavorites.length === 0) {
+    tbody.innerHTML = "<TR><TD COLSPAN='4' STYLE='text-align:center;color:#64748b;'>No favorites yet. Add some from the catalog below!</TD></TR>";
+    return;
+  }
+  let html = '';
+  deviceFavorites.forEach((st, idx) => {
+    const ch = (idx + 1) < 10 ? '0' + (idx + 1) : (idx + 1);
+    html += `
+      <TR>
+        <TD><SPAN CLASS='wr-badge wr-badge-ch'>CH ${ch}</SPAN></TD>
+        <TD><B>${escapeHtml(st.name)}</B></TD>
+        <TD><SPAN CLASS='wr-badge'>${escapeHtml(st.lang || 'General')}</SPAN></TD>
+        <TD>
+          <BUTTON CLASS='wr-btn wr-btn-play' ONCLICK='playStation(${idx})' TITLE='Play on Radio'>▶ Play</BUTTON>
+          <BUTTON CLASS='wr-btn wr-btn-del' ONCLICK='deleteStation(${idx})' TITLE='Delete from Radio'>✕ Del</BUTTON>
+        </TD>
+      </TR>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+function playStation(idx) {
+  fetch('/api/play?id=' + idx)
+    .then(r => r.json())
+    .then(d => {
+      showToast('Radio playing: ' + (deviceFavorites[idx] ? deviceFavorites[idx].name : 'Station ' + (idx + 1)));
+    })
+    .catch(e => showToast('Error playing station'));
+}
+
+function deleteStation(idx) {
+  if (!confirm('Remove this station from radio favorites?')) return;
+  fetch('/api/favorites/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ id: idx })
+  })
+  .then(r => r.json())
+  .then(d => {
+    showToast('Station removed from favorites');
+    loadFavorites();
+  })
+  .catch(e => showToast('Error deleting station'));
+}
+
+function addFavorite(name, url, lang) {
+  fetch('/api/favorites/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ name: name, url: url, lang: lang })
+  })
+  .then(r => r.json())
+  .then(d => {
+    showToast('⭐ Added "' + name + '" to radio favorites!');
+    loadFavorites();
+  })
+  .catch(e => showToast('Error adding favorite'));
+}
+
+function addCustomStation(e) {
+  e.preventDefault();
+  const name = document.getElementById('custName').value.trim();
+  const url = document.getElementById('custUrl').value.trim();
+  const lang = document.getElementById('custLang').value.trim();
+  if (!name || !url) return false;
+  addFavorite(name, url, lang);
+  document.getElementById('custName').value = '';
+  document.getElementById('custUrl').value = '';
+  document.getElementById('custLang').value = '';
+  return false;
+}
+
+function loadCatalog() {
+  fetch(CATALOG_URL)
+    .then(r => r.json())
+    .then(data => {
+      onlineCatalog = data || [];
+      renderCatalog();
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById('catalogContainer').innerHTML =
+        "<DIV STYLE='padding:20px; text-align:center; color:#ef4444;'>Failed to load online catalog from GitHub. Check internet connection.</DIV>";
+    });
+}
+
+function isFavorited(url) {
+  return deviceFavorites.some(f => f.url === url);
+}
+
+function renderCatalog() {
+  const container = document.getElementById('catalogContainer');
+  if (onlineCatalog.length === 0) return;
+  const q = document.getElementById('catalogSearch').value.toLowerCase().trim();
+  
+  const filtered = onlineCatalog.filter(st => {
+    const matchPill = (activePill === 'ALL') || 
+      (st.lang && st.lang.toLowerCase() === activePill.toLowerCase()) ||
+      (st.state && st.state.toLowerCase() === activePill.toLowerCase());
+    if (!matchPill) return false;
+    if (!q) return true;
+    return (st.name && st.name.toLowerCase().includes(q)) ||
+           (st.lang && st.lang.toLowerCase().includes(q)) ||
+           (st.state && st.state.toLowerCase().includes(q));
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = "<DIV STYLE='padding:20px; text-align:center; color:#64748b;'>No matching stations found.</DIV>";
+    return;
+  }
+
+  let html = '';
+  filtered.forEach((st, i) => {
+    const faved = isFavorited(st.url);
+    const btnHtml = faved ?
+      `<SPAN CLASS='wr-btn wr-btn-saved'>✓ Saved</SPAN>` :
+      `<BUTTON CLASS='wr-btn wr-btn-add' ONCLICK='addFavorite("${escapeJs(st.name)}", "${escapeJs(st.url)}", "${escapeJs(st.lang || '')}")'>⭐ Add</BUTTON>`;
+    html += `
+      <DIV CLASS='wr-cat-item'>
+        <DIV CLASS='wr-cat-info'>
+          <DIV CLASS='wr-cat-name'>${escapeHtml(st.name)}</DIV>
+          <DIV CLASS='wr-cat-meta'>
+            <SPAN CLASS='wr-badge'>${escapeHtml(st.lang || 'General')}</SPAN>
+            ${st.state ? `<SPAN CLASS='wr-badge wr-badge-state'>${escapeHtml(st.state)}</SPAN>` : ''}
+          </DIV>
+        </DIV>
+        <DIV>${btnHtml}</DIV>
+      </DIV>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function filterCatalog() {
+  renderCatalog();
+}
+
+function selectPill(el, pill) {
+  document.querySelectorAll('.wr-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  activePill = pill;
+  renderCatalog();
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function escapeJs(s) {
+  if (!s) return '';
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/'/g, "\\'");
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadFavorites();
+  loadCatalog();
+});
+</SCRIPT>
+)rawliteral"
+  );
+}
+

@@ -194,6 +194,17 @@ void drawFrequency(uint32_t freq, int x, int y, int ux, int uy, uint8_t hl)
   spr.setTextDatum(MR_DATUM);
   spr.setTextColor(TH.freq_text);
 
+  if(getCurrentBand()->bandType == WEB_BAND_TYPE)
+  {
+    char text[16];
+    snprintf(text, sizeof(text), "%03lu", (unsigned long)freq);
+    spr.drawString(text, x, y, FONT_DIGITS);
+    spr.setTextDatum(ML_DATUM);
+    spr.setTextColor(TH.funit_text);
+    spr.drawString("CH", ux, uy);
+    return;
+  }
+
   if(currentMode==FM)
   {
     // Determine where underscore is located

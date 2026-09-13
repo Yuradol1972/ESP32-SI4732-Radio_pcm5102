@@ -3,6 +3,7 @@
 #include "Utils.h"
 #include "Menu.h"
 #include "EIBI.h"
+#include "WebAudio.h"
 
 // CB frequency range
 #define MIN_CB_FREQUENCY 26060
@@ -73,17 +74,37 @@ const char *getStationName()
 {
   if(switchThemeEditor())
     return("*STATION*");
-  else
-    return(getRDSMode() & RDS_PS? bufStationName : "");
+  if(getCurrentBand()->bandType == WEB_BAND_TYPE)
+  {
+    static char webStationBuf[64];
+    webStationBuf[0] = (char)0xFF;
+    snprintf(webStationBuf + 1, sizeof(webStationBuf) - 1, "%s", webAudio.getCurrentStationName());
+    return webStationBuf;
+  }
+  return(getRDSMode() & RDS_PS? bufStationName : "");
 }
 
 const char *getRadioText()
 {
+  if(getCurrentBand()->bandType == WEB_BAND_TYPE)
+  {
+    const char *title = webAudio.getStreamTitle();
+    if(title && strlen(title) > 0) return title;
+    const char *lang = webAudio.getCurrentStationLanguage();
+    if(lang && strlen(lang) > 0) return lang;
+    return "Internet Radio";
+  }
   return(getRDSMode() & RDS_RT? bufRadioText : "");
 }
 
 const char *getProgramInfo()
 {
+  if(getCurrentBand()->bandType == WEB_BAND_TYPE)
+  {
+    if(webAudio.isConnecting()) return "Connecting...";
+    if(webAudio.isPlaying()) return "LIVE";
+    return "Web Ready";
+  }
   return(getRDSMode() & RDS_RT? bufProgramInfo : "");
 }
 
@@ -319,8 +340,8 @@ bool identifyFrequency(uint16_t freq, bool periodic)
   static uint16_t last_freq = 0;
   static bool name_found = false;
 
-  // RDS has priority on FM
-  if(currentMode==FM) return(false);
+  // RDS has priority on FM, not used on WEB
+  if(currentMode==FM || getCurrentBand()->bandType == WEB_BAND_TYPE) return(false);
 
   // Do not try to look up static names more than once for the same freq
   if(periodic && last_freq==freq && name_found) return(false);

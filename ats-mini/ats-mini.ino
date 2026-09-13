@@ -16,6 +16,7 @@
 #include "BleMode.h"
 #include "TcpMode.h"
 #include "Splash.h"
+#include "WebAudio.h"
 #include <stdlib.h>
 #include <time.h>
 
@@ -264,6 +265,9 @@ void setup()
 
   // Start Bluetooth LE, if necessary
   bleInit(bleModeIdx);
+
+  // Initialize Web Audio engine
+  webAudio.init();
 }
 
 
@@ -358,6 +362,27 @@ void useBand(const Band *band)
   currentFrequency = band->currentFreq;
   currentMode = band->bandMode;
   currentBFO = 0;
+
+  if(band->bandType == WEB_BAND_TYPE)
+  {
+    int maxCh = max(1, webAudio.getTotalStations());
+    if(currentFrequency > maxCh || currentFrequency < 1) currentFrequency = 1;
+    // Mute SI4732 tuner audio output
+    rx.setAudioMute(true);
+    // Boost CPU frequency to 160MHz for smooth streaming/decoding
+    setCpuFrequencyMhz(160);
+    // Start Internet Radio stream
+    webAudio.start();
+    webAudio.setStation(currentFrequency - 1);
+    return;
+  }
+  else if(webAudio.isRunning())
+  {
+    // Stop Web Audio and turn off Wi-Fi modem to eliminate RF hash
+    webAudio.stop();
+    setCpuFrequencyMhz(80);
+    rx.setAudioMute(false);
+  }
 
   if(band->bandMode==FM)
   {
@@ -501,6 +526,24 @@ bool updateBFO(int newBFO, bool wrap)
 bool updateFrequency(int newFreq, bool wrap)
 {
   Band *band = getCurrentBand();
+
+  if(band->bandType == WEB_BAND_TYPE)
+  {
+    int maxCh = max(1, webAudio.getTotalStations());
+    if(newFreq < 1)
+    {
+      if(!wrap) return false; else newFreq = maxCh;
+    }
+    else if(newFreq > maxCh)
+    {
+      if(!wrap) return false; else newFreq = 1;
+    }
+
+    currentFrequency = newFreq;
+    band->currentFreq = newFreq;
+    webAudio.setStation(newFreq - 1);
+    return true;
+  }
 
   // Do not let new frequency exceed band limits
   if(newFreq < band->minimumFreq)
@@ -709,6 +752,20 @@ bool processRssiSnr()
   static uint32_t updateCounter = 0;
   bool needRedraw = false;
 
+  if(getCurrentBand()->bandType == WEB_BAND_TYPE)
+  {
+    int wRSSI = webAudio.getWifiRSSI();
+    int newRSSI = map(constrain(wRSSI, -90, -30), -90, -30, 5, 55);
+    int newSNR = webAudio.isPlaying() ? 25 : 5;
+    if(newRSSI != rssi || newSNR != snr)
+    {
+      rssi = newRSSI;
+      snr = newSNR;
+      return true;
+    }
+    return false;
+  }
+
   rx.getCurrentReceivedSignalQuality();
   int newRSSI = rx.getCurrentRSSI();
   int newSNR = rx.getCurrentSNR();
@@ -756,6 +813,9 @@ bool processRssiSnr()
 //
 void loop()
 {
+  // Run internet radio engine if active
+  webAudio.loop();
+
   uint32_t currentTime = millis();
   bool needRedraw = false;
 

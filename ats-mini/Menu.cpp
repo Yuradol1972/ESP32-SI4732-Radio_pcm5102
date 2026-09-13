@@ -6,6 +6,7 @@
 #include "EIBI.h"
 #include "BleMode.h"
 #include "Menu.h"
+#include "WebAudio.h"
 
 #include <time.h>
 
@@ -66,6 +67,8 @@ Band bands[] =
   // https://www.hfunderground.com/wiki/CB
   // Also see MIN_CB_FREQUENCY and MAX_CB_FREQUENCY
   {"CB",   SW_BAND_TYPE, AM,  25000, 28000, 27135, 0, 4, 0, 0},
+  // Web Radio Streams
+  {"WEB",  WEB_BAND_TYPE, AM,     1, 999, 1, 0, 4, 0, 0},
 };
 
 int getTotalBands() { return(ITEM_COUNT(bands)); }
@@ -634,6 +637,7 @@ void doVolume(int16_t enc)
 {
   volume = clamp_range(volume, enc, 0, 63);
   if(!muteOn(MUTE_MAIN)) rx.setVolume(volume);
+  webAudio.setVolume(volume);
 }
 
 static void clickVolume(bool shortPress)
