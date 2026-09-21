@@ -8,15 +8,15 @@
 
 //
 // Audio Output Pinout for ATS-Mini (using spare ESP32-S3 GPIOs)
-//
+// for pcm5102 and ATS-mini https://oshwhub.com/abcdef2022/full-band-network-2-in--1-radio
 #ifndef I2S_BCLK_PIN
-#define I2S_BCLK_PIN 11  // Bit Clock (spare GPIO11)
+#define I2S_BCLK_PIN 12  // Bit Clock (spare GPIO12)
 #endif
 #ifndef I2S_LRC_PIN
-#define I2S_LRC_PIN  12  // Word Select / LR Clock (spare GPIO12)
+#define I2S_LRC_PIN  13  // Word Select / LR Clock (spare GPIO13)
 #endif
 #ifndef I2S_DOUT_PIN
-#define I2S_DOUT_PIN 13  // Serial Data Out (spare GPIO13)
+#define I2S_DOUT_PIN 11  // Serial Data Out (spare GPIO11)
 #endif
 
 #define FAVORITES_FILE_PATH "/favorites.json"
