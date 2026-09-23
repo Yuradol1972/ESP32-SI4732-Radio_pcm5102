@@ -1,4 +1,10 @@
 [
+   {
+    "name": "Novoe Radio",
+    "state": "St.Peterburg",
+    "lang": "Russian",
+    "url": "http://emgspb.hostingradio.ru/novoespb64.mp3"
+  },
   {
     "name": "Thrissur",
     "state": "Custom",
